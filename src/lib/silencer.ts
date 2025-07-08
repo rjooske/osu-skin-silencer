@@ -310,6 +310,7 @@ export function getSortedSounds(skin: Skin): Sound[] {
 }
 
 export type ParseSkinWarning =
+  | { kind: "no-skin-ini" }
   | { kind: "version-latest" }
   | { kind: "version-unknown"; version: string };
 
@@ -373,7 +374,7 @@ export async function parseSkin(
       warning = { kind: "version-unknown", version };
     }
   } else {
-    warning = { kind: "version-latest" };
+    warning = { kind: "no-skin-ini" };
   }
 
   return { kind: "ok", skin: { soundFiles, files, directories }, warning };

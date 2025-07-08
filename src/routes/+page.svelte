@@ -137,9 +137,19 @@
 {/snippet}
 
 {#snippet showParseSkinWarning(w: ParseSkinWarning)}
-  {#if w.kind === "version-latest"}
-    <code>skin.ini</code> specifies the skin version as <code>latest</code>, and
-    the latest skin version known to this tool is
+  {@const latest = "https://osu.ppy.sh/wiki/en/Skinning/skin.ini#latest"}
+  {@const general = "https://osu.ppy.sh/wiki/en/Skinning/skin.ini#[general]"}
+  {#if w.kind === "no-skin-ini"}
+    There is no <code>skin.ini</code> file in the imported skin, so the skin
+    version is <a href={general} target="_blank">assumed</a> to be
+    <a href={latest} target="_blank"><code>latest</code></a>. Since the latest
+    skin version known to this tool is <code>{LATEST_KNOWN_SKIN_VERSION}</code>,
+    if the actual latest skin version is newer than
+    <code>{LATEST_KNOWN_SKIN_VERSION}</code>, this tool may not work correctly.
+  {:else if w.kind === "version-latest"}
+    <code>skin.ini</code> specifies the skin version as
+    <a href={latest} target="_blank"><code>latest</code></a>, and the latest
+    skin version known to this tool is
     <code>{LATEST_KNOWN_SKIN_VERSION}</code>. If the actual latest skin version
     is newer than <code>{LATEST_KNOWN_SKIN_VERSION}</code>, this tool may not
     work correctly.
