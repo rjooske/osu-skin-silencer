@@ -200,8 +200,11 @@
   <legend>Edit</legend>
   <p>
     Select sounds to silence. Each sound is explained <a
-      href="https://osu.ppy.sh/wiki/en/Skinning/Sounds">here</a
-    >.
+      href="https://osu.ppy.sh/wiki/en/Skinning/Sounds"
+      target="_blank"
+    >
+      here
+    </a>.
   </p>
   <p>
     <button onclick={handleSelectAll}>Select all</button>
