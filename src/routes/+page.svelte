@@ -162,7 +162,16 @@
   {/if}
 {/snippet}
 
-<h1>Osu skin silencer</h1>
+<h1><img src="speak_no_evil.svg" alt=":speak_no_evil:" /> Osu skin silencer</h1>
+
+<p style="margin-bottom: 2em;">
+  Osu skin silencer lets you turn off specific sound effects in osu by skinning
+  them with a very short silent audio file. This is especially useful when you
+  don't want hitsounds (you probably play mania) but also don't want to miss out
+  on all the other sound effects. Simply import your skin file, select sound
+  effects to turn off, and export the silenced skin. You can finally turn your
+  effect volume back on!
+</p>
 
 <fieldset>
   <legend>Import</legend>
@@ -232,11 +241,31 @@
   </p>
 </fieldset>
 
+<footer>
+  <nav>
+    <ul>
+      <li>
+        <a href="https://github.com/rjooske/osu-skin-silencer" target="_blank">
+          Repository
+        </a>
+      </li>
+      <li>
+        <a
+          href="https://github.com/rjooske/osu-skin-silencer/issues"
+          target="_blank"
+        >
+          Report an issue
+        </a>
+      </li>
+    </ul>
+  </nav>
+</footer>
+
 <style lang="scss">
   :global {
     body {
       font-family: sans-serif;
-      margin: 0 auto;
+      margin: 1em auto;
       max-width: min(60em, 95vw);
       container-type: size;
 
@@ -246,6 +275,12 @@
         height: 50vh;
       }
     }
+  }
+
+  h1 > img {
+    height: 1.5em;
+    vertical-align: middle;
+    margin-top: -0.4em;
   }
 
   fieldset {
@@ -294,6 +329,17 @@
 
     & span {
       font-family: monospace;
+    }
+  }
+
+  footer {
+    margin-top: 3em;
+    text-align: right;
+
+    & ul {
+      list-style: none;
+      padding-left: 0;
+      line-height: 1.5em;
     }
   }
 </style>
