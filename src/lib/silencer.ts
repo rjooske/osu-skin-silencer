@@ -7,7 +7,6 @@ import {
   ZipReader,
   ZipWriter,
   type Entry,
-  type ZipWriterAddDataOptions,
 } from "@zip.js/zip.js";
 
 function base64ToArrayBuffer(base64: string): ArrayBuffer | undefined {
@@ -283,32 +282,13 @@ function findSkinVersion(skinIni: string): string | undefined {
   return match[1].trim();
 }
 
-function entryToAddOptions(e: Entry): ZipWriterAddDataOptions {
-  return {
-    comment: e.comment,
-    creationDate: e.creationDate,
-    directory: e.directory,
-    // These don't work because of the library's bug
-    // externalFileAttribute: e.externalFileAttribute,
-    // extraField: e.extraField,
-    // internalFileAttribute: e.internalFileAttribute,
-    lastAccessDate: e.lastAccessDate,
-    lastModDate: e.lastModDate,
-    msDosCompatible: e.msDosCompatible,
-    version: e.version,
-    zip64: e.zip64,
-  };
-}
-
 export type SkinFile = {
   name: string;
   content: Blob;
-  options: ZipWriterAddDataOptions;
 };
 
 export type SkinDirectory = {
   name: string;
-  options: ZipWriterAddDataOptions;
 };
 
 export type Skin = {
@@ -358,9 +338,8 @@ export async function parseSkin(
   const files: SkinFile[] = [];
   const directories: SkinDirectory[] = [];
   for (const e of entries) {
-    const options = entryToAddOptions(e);
     if (e.directory) {
-      directories.push({ name: e.filename, options });
+      directories.push({ name: e.filename });
     } else {
       assert(e.getData !== undefined);
       let content: Blob;
@@ -372,7 +351,7 @@ export async function parseSkin(
           error: { kind: "cannot-unzip-entry", thrown, filename: e.filename },
         };
       }
-      const file = { name: e.filename, content, options };
+      const file = { name: e.filename, content };
       const sound = filenameToSound(e.filename);
       if (sound !== undefined) {
         soundFiles.set(sound, file);
@@ -408,7 +387,7 @@ export async function silence(
 
   for (const [sound, f] of skin.soundFiles.entries()) {
     if (!soundsToSilence.has(sound)) {
-      await writer.add(f.name, new BlobReader(f.content), f.options);
+      await writer.add(f.name, new BlobReader(f.content));
     }
   }
   for (const s of soundsToSilence) {
@@ -416,10 +395,10 @@ export async function silence(
   }
 
   for (const f of skin.files) {
-    await writer.add(f.name, new BlobReader(f.content), f.options);
+    await writer.add(f.name, new BlobReader(f.content));
   }
   for (const d of skin.directories) {
-    await writer.add(d.name, undefined, d.options);
+    await writer.add(d.name, undefined, { directory: true });
   }
 
   return await writer.close();
