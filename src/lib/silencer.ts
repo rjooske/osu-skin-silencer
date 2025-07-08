@@ -1,4 +1,4 @@
-import silenceOgg from "./silence.ogg?base64";
+import silenceOggBlob from "./silence.ogg?blob";
 import { assert, parseNumber, splitFilename, stripPrefix } from "./util";
 import {
   BlobReader,
@@ -8,27 +8,6 @@ import {
   ZipWriter,
   type Entry,
 } from "@zip.js/zip.js";
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer | undefined {
-  let bytesString: string;
-  try {
-    bytesString = atob(base64);
-  } catch {
-    return;
-  }
-  const arrayBuffer = new ArrayBuffer(bytesString.length);
-  const bytes = new Uint8Array(arrayBuffer);
-  for (let i = 0; i < bytesString.length; i++) {
-    bytes[i] = bytesString.charCodeAt(i);
-  }
-  return arrayBuffer;
-}
-
-const SILENCE_OGG_BLOB = (() => {
-  const arrayBuffer = base64ToArrayBuffer(silenceOgg);
-  assert(arrayBuffer !== undefined);
-  return new Blob([arrayBuffer]);
-})();
 
 declare const nominalIdentifier: unique symbol;
 type Nominal<T, Identifier> = T & { [nominalIdentifier]: Identifier };
@@ -392,7 +371,7 @@ export async function silence(
     }
   }
   for (const s of soundsToSilence) {
-    await writer.add(soundToOggFilename(s), new BlobReader(SILENCE_OGG_BLOB));
+    await writer.add(soundToOggFilename(s), new BlobReader(silenceOggBlob));
   }
 
   for (const f of skin.files) {

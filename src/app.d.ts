@@ -1,8 +1,8 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
-  declare module "*?base64" {
-    const content: string;
+  declare module "*?blob" {
+    const content: Readonly<Blob>;
     export = content;
   }
 
