@@ -1,21 +1,69 @@
 <script lang="ts">
-  import { MANIA_SOUND_INDICES, silence, SOUNDS } from "$lib/silencer";
-  import { assert } from "$lib/util";
+  import {
+    CONST_SOUNDS,
+    getSortedSounds,
+    HITSOUND_SET,
+    LATEST_KNOWN_SKIN_VERSION,
+    parseSkin,
+    silence,
+    TAIKO_HITSOUND_SET,
+    type ParseSkinError,
+    type ParseSkinWarning,
+    type Skin,
+    type Sound,
+  } from "$lib/silencer";
+  import { assert, splitFilename, unreachable } from "$lib/util";
 
-  let skinFile = $state<File | undefined>();
-  let willSilence = $state(SOUNDS.map(() => false));
+  type AppNoSkinError =
+    | { kind: "cannot-read-file"; thrown: unknown; filename: string }
+    | ParseSkinError;
+
+  type App =
+    | {
+        state: "no-skin";
+        error: AppNoSkinError | undefined;
+      }
+    | {
+        state: "skin-imported";
+        skin: Skin;
+        skinName: string;
+        warning: ParseSkinWarning | undefined;
+        soundSelections: [Sound, boolean][];
+      };
+
+  let app = $state<App>({ state: "no-skin", error: undefined });
   let silencing = $state(false);
 
-  function setWillSilenceAll(b: boolean) {
-    willSilence = SOUNDS.map(() => b);
+  function handleSelectAll() {
+    assert(app.state === "skin-imported");
+    app.soundSelections = app.soundSelections.map(([s]) => [s, true]);
   }
 
-  function setWillSilenceManiaRelated(b: boolean) {
-    const newWillSilence = Array.from(willSilence);
-    for (const i of MANIA_SOUND_INDICES) {
-      newWillSilence[i] = b;
-    }
-    willSilence = newWillSilence;
+  function handleDeselectAll() {
+    assert(app.state === "skin-imported");
+    app.soundSelections = app.soundSelections.map(([s]) => [s, false]);
+  }
+
+  function handleSelectHitsounds() {
+    assert(app.state === "skin-imported");
+    app.soundSelections = app.soundSelections.map(([s, b]) => {
+      if (HITSOUND_SET.has(s)) {
+        return [s, true];
+      } else {
+        return [s, b];
+      }
+    });
+  }
+
+  function handleSelectTaikoHitsounds() {
+    assert(app.state === "skin-imported");
+    app.soundSelections = app.soundSelections.map(([s, b]) => {
+      if (TAIKO_HITSOUND_SET.has(s)) {
+        return [s, true];
+      } else {
+        return [s, b];
+      }
+    });
   }
 
   function downloadBlob(b: Blob, filename: string) {
@@ -27,50 +75,89 @@
     URL.revokeObjectURL(url);
   }
 
-  async function handleExport() {
-    function basename(s: string): string {
-      const match = /^(.*)\..*$/.exec(s);
-      if (match === null) {
-        return s;
+  async function handleSkinFileChange(file: File | undefined) {
+    async function f(file: File | undefined): Promise<App> {
+      if (file === undefined) {
+        return { state: "no-skin", error: undefined };
       }
-      assert(match.length === 2);
-      return match[1];
+
+      let arrayBuffer: ArrayBuffer;
+      try {
+        arrayBuffer = await file.arrayBuffer();
+      } catch (thrown) {
+        return {
+          state: "no-skin",
+          error: { kind: "cannot-read-file", thrown, filename: file.name },
+        };
+      }
+
+      const result = await parseSkin(arrayBuffer);
+      if (result.kind === "err") {
+        return { state: "no-skin", error: result.error };
+      }
+
+      return {
+        state: "skin-imported",
+        skin: result.skin,
+        skinName: splitFilename(file.name)[0],
+        warning: result.warning,
+        soundSelections: getSortedSounds(result.skin).map((s) => [s, false]),
+      };
     }
 
-    assert(skinFile !== undefined);
+    app = await f(file);
+  }
 
-    let skin: ArrayBuffer;
-    try {
-      skin = await skinFile.arrayBuffer();
-    } catch (e) {
-      console.error(e);
-      alert("Cannot read the imported file.");
-      return;
-    }
+  async function handleExport() {
+    assert(app.state === "skin-imported");
 
-    silencing = true;
-    const maybeSilencedSkin = await silence(
-      skin,
-      SOUNDS.filter((_, i) => willSilence[i]),
+    const soundsToSilence = new Set(
+      app.soundSelections.filter(([, b]) => b).map(([s]) => s),
     );
+    silencing = true;
+    const silencedSkin = await silence(app.skin, soundsToSilence);
     silencing = false;
 
-    if (maybeSilencedSkin.kind === "err") {
-      // TODO
-      return;
-    }
-    const { silencedSkin } = maybeSilencedSkin;
-
-    downloadBlob(silencedSkin, `${basename(skinFile.name)} (silenced).osk`);
+    downloadBlob(silencedSkin, `${app.skinName} (silenced).osk`);
   }
 </script>
+
+{#snippet showParseSkinError(e: AppNoSkinError)}
+  {#if e.kind === "cannot-read-file"}
+    Failed to read the imported file <code>{e.filename}</code>:
+    <code>{e.thrown}</code>
+  {:else if e.kind === "cannot-unzip"}
+    Failed to unzip the imported skin: <code>{e.thrown}</code>
+  {:else if e.kind === "cannot-unzip-entry"}
+    Failed to unzip the entry <code>{e.filename}</code> in the imported skin:
+    <code>{e.thrown}</code>
+  {:else}
+    {unreachable(e)}
+  {/if}
+{/snippet}
+
+{#snippet showParseSkinWarning(w: ParseSkinWarning)}
+  {#if w.kind === "version-latest"}
+    <code>skin.ini</code> specifies the skin version as <code>latest</code>, and
+    the latest skin version known to this tool is
+    <code>{LATEST_KNOWN_SKIN_VERSION}</code>. If the actual latest skin version
+    is newer than <code>{LATEST_KNOWN_SKIN_VERSION}</code>, this tool may not
+    work correctly.
+  {:else if w.kind === "version-unknown"}
+    <code>skin.ini</code> specifies the skin version as
+    <code>{w.version}</code>, which is unknown to this tool so it may not work
+    correctly.
+  {:else}
+    {unreachable(w)}
+  {/if}
+{/snippet}
 
 <h1>Osu skin silencer</h1>
 
 <fieldset>
-  <legend>Import/Export</legend>
+  <legend>Import</legend>
   <p>
-    Import a <code>.osk</code> or <code>.zip</code> file:
+    Select a <code>.osk</code> or <code>.zip</code> file:
     <input
       type="file"
       accept=".osk,.zip"
@@ -78,51 +165,61 @@
       onchange={(e) => {
         const files = e.currentTarget.files;
         assert(files !== null);
-        if (files.length === 0) {
-          skinFile = undefined;
-        } else {
-          skinFile = files[0];
-        }
+        handleSkinFileChange(files[0]);
       }}
     />
   </p>
-  <p>
-    <button
-      disabled={skinFile === undefined || silencing}
-      onclick={handleExport}
-    >
-      {silencing ? "Exporting..." : "Export silenced skin"}
-    </button>
-  </p>
+  {#if app.state === "no-skin" && app.error !== undefined}
+    <p class="error">{@render showParseSkinError(app.error)}</p>
+  {/if}
+  {#if app.state === "skin-imported" && app.warning !== undefined}
+    <p class="warning">{@render showParseSkinWarning(app.warning)}</p>
+  {/if}
 </fieldset>
 
-<fieldset disabled={skinFile === undefined}>
-  <legend>Sounds</legend>
+<fieldset disabled={app.state !== "skin-imported"}>
+  <legend>Edit</legend>
   <p>
     Select sounds to silence. Each sound is explained <a
       href="https://osu.ppy.sh/wiki/en/Skinning/Sounds">here</a
     >.
   </p>
   <p>
-    <button onclick={() => setWillSilenceAll(true)}>Select all</button>
-    <button onclick={() => setWillSilenceAll(false)}>Deselect all</button>
-    <button onclick={() => setWillSilenceManiaRelated(true)}>
-      Select mania related
-    </button>
-    <button onclick={() => setWillSilenceManiaRelated(false)}>
-      Deselect mania related
-    </button>
+    <button onclick={handleSelectAll}>Select all</button>
+    <button onclick={handleDeselectAll}>Deselect all</button>
+    <button onclick={handleSelectHitsounds}>Select hitsounds</button>
+    <button onclick={handleSelectTaikoHitsounds}>Select taiko hitsounds</button>
   </p>
   <ul class="sounds">
-    {#each SOUNDS as s, i}
-      <li>
-        <label>
-          <input type="checkbox" bind:checked={willSilence[i]} />
-          <span>{s}</span>
-        </label>
-      </li>
-    {/each}
+    {#if app.state === "skin-imported"}
+      {#each app.soundSelections as [s], i}
+        <li>
+          <label>
+            <input type="checkbox" bind:checked={app.soundSelections[i][1]} />
+            <span>{s}</span>
+          </label>
+        </li>
+      {/each}
+    {:else}
+      {#each CONST_SOUNDS as s}
+        <li>
+          <label>
+            <input type="checkbox" />
+            <span>{s}</span>
+          </label>
+        </li>
+      {/each}
+    {/if}
   </ul>
+</fieldset>
+
+<fieldset disabled={app.state !== "skin-imported"}>
+  <legend>Export</legend>
+  <p>
+    <button disabled={silencing} onclick={handleExport}>
+      {silencing ? "Exporting..." : "Export silenced skin"}
+    </button>
+  </p>
 </fieldset>
 
 <style lang="scss">
@@ -146,6 +243,28 @@
 
     &:disabled {
       opacity: 0.5;
+    }
+  }
+
+  p.error {
+    padding: 1em;
+    background-color: oklch(0.98 0.05 30);
+    border: 1px solid oklch(0.98 0.1 30);
+
+    &::before {
+      content: "❌";
+      margin-right: 1ch;
+    }
+  }
+
+  p.warning {
+    padding: 1em;
+    background-color: oklch(0.98 0.05 90);
+    border: 1px solid oklch(0.98 0.1 90);
+
+    &::before {
+      content: "⚠️";
+      margin-right: 1ch;
     }
   }
 
