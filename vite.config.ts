@@ -21,7 +21,7 @@ const blob: Plugin = {
     const bytes = Array.from(data)
       .map((b) => b.toString())
       .join(",");
-    return `export default Object.freeze(new Blob([new Uint8Array([${bytes}])]))`;
+    return `export default Object.freeze(new Blob([new Uint8Array([${bytes}])]));`;
   },
 };
 
