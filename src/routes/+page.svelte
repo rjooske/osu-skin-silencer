@@ -34,6 +34,13 @@
   let app = $state<App>({ state: "no-skin", error: undefined });
   let silencing = $state(false);
 
+  let fileInput = $state<HTMLInputElement | undefined>();
+  $effect(() => {
+    if (fileInput !== undefined) {
+      fileInput.value = "";
+    }
+  });
+
   function handleSelectAll() {
     assert(app.state === "skin-imported");
     app.soundSelections = app.soundSelections.map(([s]) => [s, true]);
@@ -178,9 +185,9 @@
   <p>
     Select a <code>.osk</code> or <code>.zip</code> file:
     <input
+      bind:this={fileInput}
       type="file"
       accept=".osk,.zip"
-      value={undefined}
       onchange={(e) => {
         const files = e.currentTarget.files;
         assert(files !== null);
